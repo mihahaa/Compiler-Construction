@@ -1,0 +1,24 @@
+program moj4
+
+
+int it;
+
+{
+
+	char dajnext(int i)
+	{
+		return (chr(ord('a')+i));
+	}
+
+	void main()
+	char mojn[];
+	{
+		it=0;
+		mojn=new char[26];
+		while(it<len(mojn))
+		{
+			print(dajnext(it));
+			it++;
+		}
+	}
+}

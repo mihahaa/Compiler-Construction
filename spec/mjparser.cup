@@ -1,0 +1,218 @@
+package rs.ac.bg.etf.pp1;
+
+import java_cup.runtime.*;
+import org.apache.log4j.*;
+
+// import java.io.*;
+import rs.ac.bg.etf.pp1.ast.*;
+
+
+parser code {:
+	
+	boolean errorDetected = false;
+	
+	Logger log = Logger.getLogger(getClass());
+
+    public void report_error(String message, Object info) {
+    	errorDetected = true;
+    	StringBuilder msg = new StringBuilder(message); 
+    	if (info instanceof Symbol)
+            msg.append (" na liniji ").append(((Symbol)info).left);
+        log.error(msg.toString());
+    }
+    
+:}
+
+scan with {:
+	Symbol s = this.getScanner().next_token();
+	if (s != null && s.value != null) 
+		log.info(s.toString() + " " + s.value.toString());
+	return s;
+:}
+
+nonterminal rs.etf.pp1.symboltable.concepts.Obj SomeConst, MethodTypeName, MethodDecl, Designator, MethodName, DesignatorName;
+nonterminal rs.etf.pp1.symboltable.concepts.Obj Program, ProgramName, MapDummy;
+nonterminal rs.etf.pp1.symboltable.concepts.Struct Type, ReturnType, Condition, CondTerm, CondFact, Expr, SingleTerm, Term;
+nonterminal rs.etf.pp1.symboltable.concepts.Struct Factor, DesignatorStatement;
+
+nonterminal DeclList, MethodDeclList, ConstDecl, VarDecl, ActParsExprList, Mulop, DummyOr, DummyAnd;
+nonterminal SomeConstList, VarDeclList, Assignop, FormPars, SomeForm, ArrayList, ActParsHelper, DesignatorAssign;
+nonterminal ConditionCondTermList, CondTermCondFactList, Relop, Addop, WhileDummy, NoElseDummy;
+nonterminal SomeVar, SomeVarList, StatementList, Statement, FormParams, FormParsVarList, IfCondition;
+nonterminal Label, SomeDesignator, Matched, Unmatched, IfElse, IfDummy, ElseDummy, Cond, MapEndDummy;
+
+terminal String IDENT;
+
+terminal PROG, LBRACE, RBRACE, CONST, SEMI, COMMA, EQUAL, LPAREN, RPAREN, MINUS;
+terminal BREAK, CLASS, ELSE, IF, WHILE, NEW, PRINT, READ, RETURN, VOID, EXTENDS;
+terminal CONT, FOR, PLUS, MUL, DIV, PERC, IFEQUAL, IFDIFF, GREATER, EGREATER;
+terminal LESS, ELESS, AND, OR, INC, DEC, COLON, DOT, LBRACKET, RBRACKET, ARROW, MAP;
+
+terminal Character CHAR;
+terminal Boolean BOOL;
+terminal Integer NUMBER;
+
+precedence left ELSE;
+
+
+
+Program ::= (Program) PROG ProgramName DeclList LBRACE MethodDeclList RBRACE;
+ProgramName::= (ProgramName) IDENT:programName;
+
+DeclList::= (DeclListConst) DeclList ConstDecl
+			|	(DeclListVarDecl) DeclList VarDecl
+			|	(DeclListEmpty);
+			
+MethodDeclList::= (MethodDeclListNoEmpty) MethodDeclList MethodDecl
+					|	(MethodDeclListEmpty);
+					
+ConstDecl::= (ConstDeclNum) CONST Type SomeConst SomeConstList SEMI; 
+
+SomeConstList::=(SomeConstListNoEmpty) SomeConstList COMMA SomeConst
+				| (SomeConstListEmpty);
+
+SomeConst::=(CharConst) IDENT:cname EQUAL CHAR:cval
+			| (BoolConst) IDENT:bname EQUAL BOOL:bval
+			| (NumberConst) IDENT:nname EQUAL NUMBER:nval;
+				
+Type::=(Type) IDENT:tip;
+
+VarDecl::= (VarDecl) Type SomeVar SomeVarList SEMI;
+
+SomeVar::=(SomeVarWith) IDENT:wname LBRACKET RBRACKET LBRACKET RBRACKET
+			| (SomeVarWithout) IDENT:woname LBRACKET RBRACKET
+			| (SomeVarEmpty) IDENT:ename
+			| (SomeVarError) error:l {: parser.report_error("Oporavak do , ili ; u zavisnosti od polozaja promenljiva u redu na liniji "+lleft, null); :};
+			
+SomeVarList::= (SomeVarListNoEmpty) SomeVarList COMMA SomeVar
+				| (SomeVarListEmpty);
+				
+MethodDecl::= (MethodDecl) MethodTypeName FormParams VarDeclList LBRACE StatementList RBRACE;
+
+ReturnType::= (ReturnTypeType) Type
+			| (ReturnTypeVoid) VOID;
+			
+FormParams::= (FormParamsNoEmpty) LPAREN FormPars RPAREN
+			| (FormParamsEmpty) LPAREN RPAREN;
+			
+MethodTypeName::= (MethodTypeName) ReturnType IDENT:methodname;
+			
+VarDeclList::= (VarDeclListNoEmpty) VarDeclList VarDecl
+			| (VarDeclListEmpty);
+			
+StatementList::= (StatementListNoEmpty) StatementList Statement
+				| (StatementListEmpty);
+				
+FormPars::= (FormPars) Type SomeForm FormParsVarList;
+
+FormParsVarList::= (FormParsVarListNoEmpty) FormParsVarList COMMA Type SomeForm
+				| (FormParsVarListEmpty)
+				;
+				
+SomeForm::=(SomeFormWith) IDENT:fwname LBRACKET RBRACKET LBRACKET RBRACKET
+			| (SomeFormWithout) IDENT:fwoname LBRACKET RBRACKET
+			| (SomeFormEmpty) IDENT:fename
+			| (SomeFormError) error:l {: parser.report_error("Oporavak do , ili ) u zavisnosti od polozaja promenljiva u redu na liniji "+lleft, null); :};
+			
+ActParsExprList::= (ActParsExprListNoEmpty) ActParsExprList COMMA Expr
+					| (ActParsExprListEmpty) Expr;
+			
+Expr::= (ExprAddop) Expr Addop Term
+	 | (ExprTerm) SingleTerm;
+	 
+SingleTerm::= (SingleTermNoNeg) Term
+			| (SingleTermNeg) MINUS Term;
+				
+Term::= (TermFactor) Factor
+		| (TermMulopFactor) Term Mulop Factor;
+					
+Factor::= (FactorDesignatorNo) Designator
+		| (FactorMethod) MethodName LPAREN ActParsHelper RPAREN
+		| (FactorNewExpr) NEW Type LBRACKET Expr RBRACKET
+		| (FactorExpr) LPAREN Expr RPAREN
+		| (FactorNewMatrixExpr) NEW Type LBRACKET Expr:em1 RBRACKET LBRACKET Expr:em2 RBRACKET
+		| (FactorBool) BOOL
+		| (FactorNumber) NUMBER
+		| (FactorChar) CHAR;
+		
+MethodName::= (MethodName) Designator;
+
+ActParsHelper::= (ActParsHelperNoEmpty) ActParsExprList
+				| (ActParsHelperEmpty);
+			
+ArrayList::= (ArrayListNoEmpty) ArrayList LBRACKET Expr RBRACKET
+			| (ArrayListEmpty);
+		
+Addop::= (AddopPlus) PLUS
+		| (AddopMinus) MINUS;
+		
+Label::= (Label) IDENT;
+
+Assignop::= (Assignop) EQUAL;
+
+Cond::=(Cond) Condition;
+		
+Condition::= (ConditionNoEmpty) CondTerm
+			| (ConditionEmpty) Condition DummyOr OR CondTerm;
+					
+CondTerm::= (CondTermNoEmpty) CondFact
+			| (CondTermEmpty) CondTerm DummyAnd AND CondFact;
+			
+DummyAnd::= (DummyAnd);
+DummyOr::= (DummyOr);
+
+Relop::= (RelopEq) IFEQUAL
+		| (RelopNEq) IFDIFF
+		| (RelopGre) GREATER
+		| (RelopEGre) EGREATER
+		| (RelopLess) LESS
+		| (RelopELess) ELESS;
+							
+CondFact::= (CondFactWithout) Expr
+			| (CondFactWith) Expr Relop Expr;
+			
+IfCondition::= (IfConditionNoError) Cond
+			| (IfConditionError) error:l {: parser.report_error("Oporavak do ) u if naredbi na liniji "+lleft, null); :};
+						
+Statement::= (StatementDesignator) DesignatorStatement
+			| (StatementIf) IF IfDummy LPAREN IfCondition RPAREN Statement NoElseDummy
+			| (StatementIfElse) IF IfDummy LPAREN IfCondition RPAREN Statement ELSE ElseDummy Statement
+			| (StatementWhile) WhileDummy WHILE LPAREN Cond RPAREN Statement
+			| (StatementBreak) BREAK SEMI
+			| (StatementCont) CONT SEMI
+			| (StatementReturnWithout) RETURN SEMI
+			| (StatementReturnWith) RETURN Expr:retexpr SEMI
+			| (StatementRead) READ LPAREN Designator RPAREN SEMI
+			| (StatementPrintWithout) PRINT LPAREN Expr RPAREN SEMI
+			| (StatementPrintWith) PRINT LPAREN Expr COMMA NUMBER:printnum RPAREN SEMI
+			| (StatementMap) MapDummy ARROW Expr RPAREN SEMI MapEndDummy
+			| (StatementBraces) LBRACE StatementList RBRACE;
+
+
+MapEndDummy::= (MapEndDummy);
+MapDummy::= (MapDummy) Designator:mapd1 EQUAL Designator:mapd2 DOT MAP LPAREN IDENT:mapname;
+WhileDummy::= (WhileDummy);
+
+IfDummy::= (IfDummy);
+ElseDummy::= (ElseDummy);
+
+DesignatorName::= (DesignatorName) IDENT;
+			
+Mulop::= (MulopMul) MUL
+		| (MulopDiv) DIV
+		| (MulopPerc) PERC;
+		
+NoElseDummy::= (NoElseDummy);
+
+DesignatorAssign::= (DesignatorAssignNoError) Designator:desigsd EQUAL Expr SEMI
+					| (DesignatorAssignError) error:l {: parser.report_error("Oporavak do ; u operaciji dodele na liniji "+lleft, null); :};
+		
+Designator::= (DesignatorSingle) DesignatorName
+			| (DesignatorArray) DesignatorName LBRACKET Expr RBRACKET 
+			| (DesignatorMatrix) DesignatorName LBRACKET Expr RBRACKET LBRACKET Expr RBRACKET
+			| (DesignatorError) DesignatorName LBRACKET Expr RBRACKET LBRACKET Expr RBRACKET LBRACKET Expr RBRACKET ArrayList;		
+						
+DesignatorStatement::= (DesignatorStatementAssignopExpr) DesignatorAssign
+							| (DesignatorStatementMethod) MethodName LPAREN ActParsHelper RPAREN SEMI
+							| (DesignatorStatementInc) Designator INC SEMI
+							| (DesignatorStatementDec) Designator DEC SEMI;							

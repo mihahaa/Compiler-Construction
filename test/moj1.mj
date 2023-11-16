@@ -1,0 +1,22 @@
+program moj1
+
+const int jedan = 1;
+bool niz[];
+bool niz2[];
+bool c;
+
+{
+	
+	void main()
+	{
+		niz=new bool[2];
+		niz[0]=true;
+		niz[1]=true;
+		print(niz[0]);
+		print(niz[1]);
+		niz2=niz.map(c => false);
+		print(niz2[0]);
+		print(niz2[1]);
+	}
+}
+
